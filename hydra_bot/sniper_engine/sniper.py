@@ -1,1 +1,0 @@
-# Sniping strategy logic

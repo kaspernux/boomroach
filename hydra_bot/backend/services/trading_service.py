@@ -1,41 +1,18 @@
-from solana.rpc.api import Client
-from solana.transaction import Transaction
-from solana.publickey import PublicKey
-from solana.system_program import TransferParams, transfer
-from config.keys.keys import SOLANA_PRIVATE_KEY
-from utils.helpers import load_wallet
-from datetime import datetime
 import logging
+from datetime import datetime
 
-def get_best_route(token):
+def execute_trade(token: str, amount: float) -> dict:
+    """
+    Simulate executing a trade on Solana.
+    In real implementation, this would call Solana RPC or Jupiter Aggregator.
+    """
+    logging.info(f"Executing trade: Token={token}, Amount={amount}")
+
+    # Simulate a successful trade execution
     return {
-        "to_token": token,
-        "min_output": 0.9,
-        "route": ["SOL", token]
+        "status": "success",
+        "token": token,
+        "amount": amount,
+        "timestamp": datetime.utcnow().isoformat(),
+        "tx_hash": "mocked_tx_hash_123456789"
     }
-
-async def execute_trade(token: str, amount: float):
-    try:
-        client = Client("https://api.mainnet-beta.solana.com")
-        wallet = load_wallet(SOLANA_PRIVATE_KEY)
-        pubkey = wallet.public_key
-
-        route = get_best_route(token)
-        recipient = PublicKey("ReplaceWithActualTokenProgram")
-        lamports = int(amount * 1_000_000_000)
-
-        tx = Transaction().add(
-            transfer(TransferParams(from_pubkey=pubkey, to_pubkey=recipient, lamports=lamports))
-        )
-
-        response = client.send_transaction(tx, wallet)
-        return {
-            "status": "success",
-            "token": token,
-            "amount": amount,
-            "tx_hash": response.get("result"),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        logging.error(f"Trade failed: {e}")
-        return {"status": "error", "error": str(e)}

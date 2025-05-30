@@ -1,12 +1,6 @@
-from telegram.ext import ApplicationBuilder
-from telegram_bot.handlers.main import register_handlers
-from config.keys.keys import TELEGRAM_BOT_TOKEN
+from telegram.ext import ApplicationBuilder, CommandHandler
+from handlers.main import start
+from commands.trade import trade
 
-def main():
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    register_handlers(app)
-    print("🐞 Roach invasion has started...")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+# Placeholder for backend integration
+from backend.services.trading_service import execute_trade  # Assume future implementation
