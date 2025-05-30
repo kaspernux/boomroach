@@ -188,7 +188,7 @@ export function AchievementCard({ achievement }: { achievement: Achievement }) {
                 '0 0 20px rgba(255, 165, 0, 0.3)'
               ]
             }}
-            transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
+            transition={{ duration: 2, repeat: Infinity }}
           />
         )}
       </Card>

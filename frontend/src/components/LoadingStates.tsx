@@ -13,17 +13,17 @@ export function PriceCardSkeleton() {
           <motion.div
             className="h-8 bg-gradient-to-r from-neon-orange/20 to-neon-orange/40 rounded"
             animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY }}
+            transition={{ duration: 1.5, repeat: Infinity }}
           />
           <motion.div
             className="h-4 bg-muted/20 rounded mx-auto w-2/3"
             animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, delay: 0.2 }}
+            transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
           />
           <motion.div
             className="h-3 bg-neon-green/30 rounded mx-auto w-1/2"
             animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, delay: 0.4 }}
+            transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
           />
         </div>
       </CardContent>
@@ -38,7 +38,7 @@ export function ShimmerLoader({ className = '' }: { className?: string }) {
       <motion.div
         className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
         animate={{ x: ['-100%', '100%'] }}
-        transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
       />
     </div>
   )
@@ -57,7 +57,7 @@ export function TradingSignalSkeleton() {
             <motion.div
               className="w-3 h-3 rounded-full bg-neon-orange/50"
               animate={{ opacity: [0.3, 1, 0.3] }}
-              transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, delay: i * 0.2 }}
+              transition={{ duration: 2, repeat: Infinity, delay: i * 0.2 }}
             />
             <div className="space-y-2">
               <div className="h-4 bg-muted/30 rounded w-16" />
@@ -86,13 +86,13 @@ export function BotPerformanceSkeleton() {
               <motion.div
                 className="h-6 bg-nuclear-glow/40 rounded w-16"
                 animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY }}
+                transition={{ duration: 1.5, repeat: Infinity }}
               />
             </div>
             <motion.div
               className="w-3 h-3 bg-neon-green rounded-full"
               animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
+              transition={{ duration: 1, repeat: Infinity }}
             />
           </div>
 
@@ -103,7 +103,7 @@ export function BotPerformanceSkeleton() {
                 <motion.div
                   className="h-5 bg-neon-orange/30 rounded"
                   animate={{ opacity: [0.4, 1, 0.4] }}
-                  transition={{ duration: 1.8, repeat: Number.POSITIVE_INFINITY, delay: i * 0.3 }}
+                  transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.3 }}
                 />
               </div>
             ))}
@@ -146,7 +146,7 @@ export function ProgressiveImage({
         <motion.div
           className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
           animate={{ x: ['-100%', '100%'] }}
-          transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
         />
       )}
 
@@ -185,14 +185,14 @@ export function NuclearSpinner({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
     <motion.div
       className={`${sizeClasses[size]} relative`}
       animate={{ rotate: 360 }}
-      transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
+      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
     >
       <div className="absolute inset-0 rounded-full border-2 border-neon-orange/20" />
       <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-neon-orange" />
       <motion.div
         className="absolute inset-1 rounded-full bg-nuclear-glow/20"
         animate={{ scale: [0.8, 1.2, 0.8] }}
-        transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
+        transition={{ duration: 2, repeat: Infinity }}
       />
     </motion.div>
   )
@@ -211,7 +211,7 @@ export function TypingIndicator() {
             animate={{ opacity: [0.3, 1, 0.3] }}
             transition={{
               duration: 1.5,
-              repeat: Number.POSITIVE_INFINITY,
+              repeat: Infinity,
               delay: i * 0.2
             }}
           />

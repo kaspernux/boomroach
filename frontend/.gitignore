@@ -16,7 +16,6 @@
 # next.js
 /.next/
 /out/
-/output/
 
 # production
 /build
@@ -32,11 +31,11 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-#.env*
+.env*
 
 # vercel
 .vercel
 
 # typescript
-#*.tsbuildinfo
-#next-env.d.ts
+*.tsbuildinfo
+next-env.d.ts
