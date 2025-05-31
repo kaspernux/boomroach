@@ -19,7 +19,7 @@ The most advanced Solana meme coin platform ever created for 2025, featuring the
 ### 🎯 **Frontend (Next.js 15.3.2)**
 
 ```
-boomroach/
+frontend/
 ├── src/
 │   ├── components/
 │   │   ├── trading/           # Trading interface & Hydra Bot
@@ -73,7 +73,7 @@ backend/
 1. **Clone & Setup**
 
    ```bash
-   git clone <repository>
+   git clone https://github.com/kaspernux/boomroach.git
    cd boomroach
    ```
 
@@ -103,7 +103,7 @@ backend/
    - **API Docs**: http://localhost:3001/api-docs
    - **Database Admin**: http://localhost:8081
 
-## 🤖 **HYDRA BOT - THE ULTIMATE TRADING SYSTEM**
+## 🤖 **HYDRA ROACH - THE ULTIMATE TRADING BOT SYSTEM**
 
 ### 🧠 **AI-Powered Intelligence**
 
