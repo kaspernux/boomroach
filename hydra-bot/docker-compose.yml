@@ -1,0 +1,351 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: hydra-postgres
+    environment:
+      POSTGRES_DB: hydra
+      POSTGRES_USER: hydra
+      POSTGRES_PASSWORD: hydra_secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # Redis Cache & Pub/Sub
+  redis:
+    image: redis:7-alpine
+    container_name: hydra-redis
+    command: redis-server --appendonly yes --requirepass redis_secure_password
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # Enhanced Node.js Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hydra-backend
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://hydra:hydra_secure_password@postgres:5432/hydra
+      REDIS_URL: redis://:redis_secure_password@redis:6379
+      JWT_SECRET: your-super-secret-jwt-key
+      SOLANA_RPC_URL: https://api.mainnet-beta.solana.com
+      SOLANA_WS_URL: wss://api.mainnet-beta.solana.com
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # Python Trading Engine
+  trading-engine:
+    build:
+      context: ./trading_engine
+      dockerfile: Dockerfile
+    container_name: hydra-trading-engine
+    environment:
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql://hydra:hydra_secure_password@postgres:5432/hydra
+      REDIS_URL: redis://:redis_secure_password@redis:6379
+      SOLANA_RPC_URL: https://api.mainnet-beta.solana.com
+      SOLANA_WS_URL: wss://api.mainnet-beta.solana.com
+      JUPITER_API_URL: https://quote-api.jup.ag/v6
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      COINGECKO_API_KEY: ${COINGECKO_API_KEY}
+      PRIVATE_KEY: ${PRIVATE_KEY}
+      MAX_SLIPPAGE: 1.0
+      PRIORITY_FEE: 0.01
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    volumes:
+      - ./trading_engine:/app
+      - ./logs:/app/logs
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # AI Signal Engine
+  ai-signal-engine:
+    build:
+      context: ./ai_signal_engine
+      dockerfile: Dockerfile
+    container_name: hydra-ai-signals
+    environment:
+      PYTHONPATH: /app
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      REDIS_URL: redis://:redis_secure_password@redis:6379
+      DATABASE_URL: postgresql://hydra:hydra_secure_password@postgres:5432/hydra
+      COINGECKO_API_KEY: ${COINGECKO_API_KEY}
+      TWITTER_BEARER_TOKEN: ${TWITTER_BEARER_TOKEN}
+    ports:
+      - "8001:8001"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./ai_signal_engine:/app
+      - ./logs:/app/logs
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # Sniper Engine
+  sniper-engine:
+    build:
+      context: ./sniper_engine
+      dockerfile: Dockerfile
+    container_name: hydra-sniper
+    environment:
+      PYTHONPATH: /app
+      SOLANA_RPC_URL: https://api.mainnet-beta.solana.com
+      SOLANA_WS_URL: wss://api.mainnet-beta.solana.com
+      REDIS_URL: redis://:redis_secure_password@redis:6379
+      PRIVATE_KEY: ${PRIVATE_KEY}
+      MAX_POSITION_SIZE: 1.0
+      SNIPER_ENABLED: true
+    ports:
+      - "8002:8002"
+    depends_on:
+      - postgres
+      - redis
+      - trading-engine
+    volumes:
+      - ./sniper_engine:/app
+      - ./logs:/app/logs
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # Re-entry Engine
+  reentry-engine:
+    build:
+      context: ./reentry_engine
+      dockerfile: Dockerfile
+    container_name: hydra-reentry
+    environment:
+      PYTHONPATH: /app
+      SOLANA_RPC_URL: https://api.mainnet-beta.solana.com
+      REDIS_URL: redis://:redis_secure_password@redis:6379
+      DATABASE_URL: postgresql://hydra:hydra_secure_password@postgres:5432/hydra
+      PRIVATE_KEY: ${PRIVATE_KEY}
+      MOMENTUM_THRESHOLD: 0.15
+      REENTRY_ENABLED: true
+    ports:
+      - "8003:8003"
+    depends_on:
+      - postgres
+      - redis
+      - trading-engine
+    volumes:
+      - ./reentry_engine:/app
+      - ./logs:/app/logs
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # Guardian Risk Management
+  guardian-risk:
+    build:
+      context: ./guardian_risk
+      dockerfile: Dockerfile
+    container_name: hydra-guardian
+    environment:
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql://hydra:hydra_secure_password@postgres:5432/hydra
+      REDIS_URL: redis://:redis_secure_password@redis:6379
+      SOLANA_RPC_URL: https://api.mainnet-beta.solana.com
+      MAX_DAILY_LOSS: 5.0
+      MAX_POSITION_SIZE: 10.0
+      STOP_LOSS_PERCENTAGE: 15.0
+    ports:
+      - "8004:8004"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./guardian_risk:/app
+      - ./logs:/app/logs
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # Telegram Bot
+  telegram-bot:
+    build:
+      context: ./telegram_bot
+      dockerfile: Dockerfile
+    container_name: hydra-telegram
+    environment:
+      PYTHONPATH: /app
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL}
+      BACKEND_API_URL: http://backend:3001
+      TRADING_API_URL: http://trading-engine:8000
+      REDIS_URL: redis://:redis_secure_password@redis:6379
+    ports:
+      - "8005:8005"
+    depends_on:
+      - backend
+      - trading-engine
+      - redis
+    volumes:
+      - ./telegram_bot:/app
+      - ./logs:/app/logs
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # Treasury Management
+  treasury:
+    build:
+      context: ./treasury
+      dockerfile: Dockerfile
+    container_name: hydra-treasury
+    environment:
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql://hydra:hydra_secure_password@postgres:5432/hydra
+      REDIS_URL: redis://:redis_secure_password@redis:6379
+      SOLANA_RPC_URL: https://api.mainnet-beta.solana.com
+      TREASURY_WALLET: ${TREASURY_WALLET}
+      BOOMROACH_TOKEN_MINT: ${BOOMROACH_TOKEN_MINT}
+      COMMISSION_RATE: 0.015
+      BURN_SCHEDULE: "0 0 * * 0"  # Weekly on Sunday
+    ports:
+      - "8006:8006"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./treasury:/app
+      - ./logs:/app/logs
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # Nginx Load Balancer & API Gateway
+  nginx:
+    image: nginx:alpine
+    container_name: hydra-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - backend
+      - trading-engine
+      - ai-signal-engine
+      - sniper-engine
+      - reentry-engine
+      - guardian-risk
+      - telegram-bot
+      - treasury
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: hydra-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: hydra-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - hydra-network
+    restart: unless-stopped
+
+  # Redis Commander (Development)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: hydra-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:redis_secure_password
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - hydra-network
+    profiles:
+      - development
+
+  # Adminer Database Management (Development)
+  adminer:
+    image: adminer:latest
+    container_name: hydra-adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - hydra-network
+    profiles:
+      - development
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  hydra-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

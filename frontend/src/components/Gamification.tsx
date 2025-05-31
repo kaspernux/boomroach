@@ -188,7 +188,7 @@ export function AchievementCard({ achievement }: { achievement: Achievement }) {
                 '0 0 20px rgba(255, 165, 0, 0.3)'
               ]
             }}
-            transition={{ duration: 2, repeat: Infinity }}
+            transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
           />
         )}
       </Card>
@@ -395,7 +395,7 @@ export function ProgressTracker() {
       </CardHeader>
       <CardContent className="space-y-3">
         {progressItems.map((item, index) => (
-          <div key={index} className="flex items-center space-x-3">
+          <div key={`progress-${index}`} className="flex items-center space-x-3">
             <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
               item.completed
                 ? 'bg-neon-green text-background'

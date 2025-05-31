@@ -1,387 +1,541 @@
-"use client";
+'use client'
 
-import React, { useState, useEffect, createContext, useContext } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Trophy, 
-  Star, 
-  Crown, 
-  Zap, 
-  Target, 
-  Gift,
-  Medal,
-  Shield,
-  Flame,
-  Rocket
-} from "lucide-react";
+import type React from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useWallet } from '@solana/wallet-adapter-react'
 
-interface Achievement {
-  id: string;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  tier: 'bronze' | 'silver' | 'gold' | 'diamond';
-  progress: number;
-  maxProgress: number;
-  unlocked: boolean;
-  reward: string;
+// Achievement types and interfaces
+export interface Achievement {
+  id: string
+  title: string
+  description: string
+  icon: string
+  type: 'wallet' | 'trading' | 'dao' | 'social' | 'special'
+  rarity: 'common' | 'rare' | 'epic' | 'legendary'
+  progress: number
+  maxProgress: number
+  unlocked: boolean
+  unlockedAt?: Date
+  reward?: {
+    type: 'tokens' | 'nft' | 'badge' | 'access'
+    amount?: number
+    description: string
+  }
 }
 
-interface UserStats {
-  level: number;
-  xp: number;
-  maxXp: number;
-  walletsConnected: number;
-  tradesSimulated: number;
-  daoVotes: number;
-  referrals: number;
-  daysActive: number;
+export interface UserStats {
+  level: number
+  xp: number
+  nextLevelXp: number
+  totalTrades: number
+  walletsConnected: number
+  daoVotes: number
+  tokensHeld: number
+  referrals: number
+  daysActive: number
 }
 
 interface GamificationContextType {
-  userStats: UserStats;
-  achievements: Achievement[];
-  updateStats: (statType: keyof UserStats, value: number) => void;
-  showNotification: (achievement: Achievement) => void;
+  achievements: Achievement[]
+  userStats: UserStats
+  updateStats: (stat: keyof UserStats, value: number) => void
+  unlockAchievement: (achievementId: string) => void
+  addXP: (amount: number) => void
+  checkLevelUp: () => boolean
 }
 
-const GamificationContext = createContext<GamificationContextType | null>(null);
+const GamificationContext = createContext<GamificationContextType | undefined>(undefined)
 
-const achievementsList: Achievement[] = [
+// Default achievements
+const defaultAchievements: Achievement[] = [
   {
-    id: 'first-wallet',
-    title: 'First Connection',
-    description: 'Connect your first wallet',
-    icon: <Shield className="w-6 h-6" />,
-    tier: 'bronze',
+    id: 'first-connection',
+    title: 'Nuclear Roach',
+    description: 'Connect your first Solana wallet',
+    icon: '⚡',
+    type: 'wallet',
+    rarity: 'common',
     progress: 0,
     maxProgress: 1,
     unlocked: false,
-    reward: '100 XP'
+    reward: { type: 'tokens', amount: 100, description: '100 $BOOMROACH tokens' }
   },
   {
-    id: 'whale-trader',
-    title: 'Whale Trader',
-    description: 'Simulate 10 trades with Hydra Bot',
-    icon: <Rocket className="w-6 h-6" />,
-    tier: 'silver',
+    id: 'curious-explorer',
+    title: 'Curious Explorer',
+    description: 'Visit the BoomRoach site and start exploring',
+    icon: '🔍',
+    type: 'special',
+    rarity: 'common',
     progress: 0,
-    maxProgress: 10,
+    maxProgress: 1,
     unlocked: false,
-    reward: '500 XP + Trading Badge'
+    reward: { type: 'tokens', amount: 50, description: '50 $BOOMROACH exploration bonus' }
   },
   {
-    id: 'dao-member',
-    title: 'DAO Participant',
-    description: 'Cast 5 votes in DAO governance',
-    icon: <Crown className="w-6 h-6" />,
-    tier: 'gold',
+    id: 'about-explorer',
+    title: 'Knowledge Seeker',
+    description: 'Explore the About section and learn about BoomRoach',
+    icon: '📚',
+    type: 'special',
+    rarity: 'common',
     progress: 0,
-    maxProgress: 5,
+    maxProgress: 1,
     unlocked: false,
-    reward: '1000 XP + Governance Badge'
+    reward: { type: 'tokens', amount: 75, description: '75 $BOOMROACH knowledge bonus' }
   },
   {
-    id: 'community-builder',
-    title: 'Community Builder',
-    description: 'Refer 3 new members',
-    icon: <Star className="w-6 h-6" />,
-    tier: 'silver',
+    id: 'tokenomics-explorer',
+    title: 'Economics Expert',
+    description: 'Study the tokenomics and understand the economics',
+    icon: '📊',
+    type: 'special',
+    rarity: 'common',
+    progress: 0,
+    maxProgress: 1,
+    unlocked: false,
+    reward: { type: 'tokens', amount: 75, description: '75 $BOOMROACH knowledge bonus' }
+  },
+  {
+    id: 'hydra-explorer',
+    title: 'AI Enthusiast',
+    description: 'Explore the Hydra Bot section and learn about AI trading',
+    icon: '🤖',
+    type: 'special',
+    rarity: 'rare',
+    progress: 0,
+    maxProgress: 1,
+    unlocked: false,
+    reward: { type: 'tokens', amount: 150, description: '150 $BOOMROACH tech bonus' }
+  },
+  {
+    id: 'roadmap-explorer',
+    title: 'Future Visionary',
+    description: 'Check out the roadmap and see the future plans',
+    icon: '🗺️',
+    type: 'special',
+    rarity: 'common',
+    progress: 0,
+    maxProgress: 1,
+    unlocked: false,
+    reward: { type: 'tokens', amount: 100, description: '100 $BOOMROACH vision bonus' }
+  },
+  {
+    id: 'community-voter',
+    title: 'Democracy Champion',
+    description: 'Participate in community voting',
+    icon: '🗳️',
+    type: 'dao',
+    rarity: 'rare',
+    progress: 0,
+    maxProgress: 1,
+    unlocked: false,
+    reward: { type: 'tokens', amount: 200, description: '200 $BOOMROACH democracy bonus' }
+  },
+  {
+    id: 'first-trade',
+    title: 'Trader Roach',
+    description: 'Execute your first trade through Hydra Bot',
+    icon: '💹',
+    type: 'trading',
+    rarity: 'rare',
+    progress: 0,
+    maxProgress: 1,
+    unlocked: false,
+    reward: { type: 'nft', description: 'Exclusive Trader Roach NFT' }
+  },
+  {
+    id: 'whale-holder',
+    title: 'Whale Roach',
+    description: 'Hold 1,000,000+ $BOOMROACH tokens',
+    icon: '🐋',
+    type: 'trading',
+    rarity: 'legendary',
+    progress: 0,
+    maxProgress: 1000000,
+    unlocked: false,
+    reward: { type: 'badge', description: 'Legendary Whale badge + VIP access' }
+  },
+  {
+    id: 'survivor',
+    title: 'Survivor Roach',
+    description: 'Hold through 3 major market crashes',
+    icon: '🛡️',
+    type: 'special',
+    rarity: 'epic',
     progress: 0,
     maxProgress: 3,
     unlocked: false,
-    reward: '750 XP + Builder Badge'
+    reward: { type: 'tokens', amount: 10000, description: '10,000 bonus tokens' }
+  },
+  {
+    id: 'social-influencer',
+    title: 'Influencer Roach',
+    description: 'Refer 10 new members to the community',
+    icon: '📢',
+    type: 'social',
+    rarity: 'epic',
+    progress: 0,
+    maxProgress: 10,
+    unlocked: false,
+    reward: { type: 'nft', description: 'Special Influencer NFT' }
+  },
+  {
+    id: 'level-10',
+    title: 'Veteran Roach',
+    description: 'Reach level 10',
+    icon: '⭐',
+    type: 'special',
+    rarity: 'rare',
+    progress: 0,
+    maxProgress: 1,
+    unlocked: false,
+    reward: { type: 'badge', description: 'Veteran status badge' }
+  },
+  {
+    id: 'daily-streak',
+    title: 'Loyal Roach',
+    description: 'Stay active for 30 consecutive days',
+    icon: '🔥',
+    type: 'special',
+    rarity: 'epic',
+    progress: 0,
+    maxProgress: 30,
+    unlocked: false,
+    reward: { type: 'tokens', amount: 5000, description: '5,000 loyalty bonus tokens' }
+  },
+  {
+    id: 'trader-veteran',
+    title: 'Trading Veteran',
+    description: 'Complete 10 successful trades',
+    icon: '📈',
+    type: 'trading',
+    rarity: 'rare',
+    progress: 0,
+    maxProgress: 10,
+    unlocked: false,
+    reward: { type: 'nft', description: 'Veteran Trader NFT badge' }
+  },
+  {
+    id: 'ai-follower',
+    title: 'AI Enthusiast',
+    description: 'Follow 5 AI trading signals',
+    icon: '🤖',
+    type: 'trading',
+    rarity: 'common',
+    progress: 0,
+    maxProgress: 5,
+    unlocked: false,
+    reward: { type: 'tokens', amount: 250, description: '250 $BOOMROACH AI bonus' }
+  },
+  {
+    id: 'profit-master',
+    title: 'Profit Master',
+    description: 'Achieve 100% portfolio gain',
+    icon: '💰',
+    type: 'trading',
+    rarity: 'legendary',
+    progress: 0,
+    maxProgress: 100,
+    unlocked: false,
+    reward: { type: 'badge', description: 'Golden Roach title + VIP access' }
+  },
+  {
+    id: 'community-champion',
+    title: 'Community Champion',
+    description: 'Send 100 messages in community chat',
+    icon: '💬',
+    type: 'social',
+    rarity: 'rare',
+    progress: 0,
+    maxProgress: 100,
+    unlocked: false,
+    reward: { type: 'tokens', amount: 1000, description: '1,000 $BOOMROACH social bonus' }
+  },
+  {
+    id: 'early-bird',
+    title: 'Early Bird',
+    description: 'Join during the first week of launch',
+    icon: '🐦',
+    type: 'special',
+    rarity: 'epic',
+    progress: 0,
+    maxProgress: 1,
+    unlocked: false,
+    reward: { type: 'nft', description: 'Exclusive Early Bird NFT' }
   },
   {
     id: 'diamond-hands',
     title: 'Diamond Hands',
-    description: 'Stay active for 30 days',
-    icon: <Trophy className="w-6 h-6" />,
-    tier: 'diamond',
-    progress: 0,
-    maxProgress: 30,
-    unlocked: false,
-    reward: '2500 XP + Diamond Badge'
-  },
-  {
-    id: 'early-adopter',
-    title: 'Early Adopter',
-    description: 'One of the first 1000 users',
-    icon: <Flame className="w-6 h-6" />,
-    tier: 'gold',
+    description: 'Hold tokens through 50% market dip',
+    icon: '💎',
+    type: 'special',
+    rarity: 'legendary',
     progress: 0,
     maxProgress: 1,
     unlocked: false,
-    reward: '1500 XP + Founder Badge'
+    reward: { type: 'badge', description: 'Diamond Hands legendary status' }
+  },
+  {
+    id: 'speed-trader',
+    title: 'Speed Trader',
+    description: 'Execute 5 trades in under 1 minute',
+    icon: '⚡',
+    type: 'trading',
+    rarity: 'epic',
+    progress: 0,
+    maxProgress: 5,
+    unlocked: false,
+    reward: { type: 'tokens', amount: 2000, description: '2,000 $BOOMROACH speed bonus' }
+  },
+  {
+    id: 'challenge-master',
+    title: 'Challenge Master',
+    description: 'Complete 10 community challenges',
+    icon: '🏆',
+    type: 'special',
+    rarity: 'legendary',
+    progress: 0,
+    maxProgress: 10,
+    unlocked: false,
+    reward: { type: 'badge', description: 'Master Champion title + exclusive perks' }
+  },
+  {
+    id: 'referral-king',
+    title: 'Referral King',
+    description: 'Refer 25 new active users',
+    icon: '👑',
+    type: 'social',
+    rarity: 'legendary',
+    progress: 0,
+    maxProgress: 25,
+    unlocked: false,
+    reward: { type: 'tokens', amount: 10000, description: '10,000 $BOOMROACH + special title' }
+  },
+  {
+    id: 'trading-explorer',
+    title: 'Trading Explorer',
+    description: 'Visit the Hydra trading platform',
+    icon: '🚀',
+    type: 'special',
+    rarity: 'common',
+    progress: 0,
+    maxProgress: 1,
+    unlocked: false,
+    reward: { type: 'tokens', amount: 100, description: '100 $BOOMROACH exploration bonus' }
   }
-];
+]
 
-export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [userStats, setUserStats] = useState<UserStats>({
-    level: 1,
-    xp: 0,
-    maxXp: 1000,
-    walletsConnected: 0,
-    tradesSimulated: 0,
-    daoVotes: 0,
-    referrals: 0,
-    daysActive: 1
-  });
+const defaultUserStats: UserStats = {
+  level: 1,
+  xp: 0,
+  nextLevelXp: 1000,
+  totalTrades: 0,
+  walletsConnected: 0,
+  daoVotes: 0,
+  tokensHeld: 0,
+  referrals: 0,
+  daysActive: 1
+}
 
-  const [achievements, setAchievements] = useState<Achievement[]>(achievementsList);
-  const [notifications, setNotifications] = useState<Achievement[]>([]);
+export function GamificationProvider({ children }: { children: React.ReactNode }) {
+  const [achievements, setAchievements] = useState<Achievement[]>(defaultAchievements)
+  const [userStats, setUserStats] = useState<UserStats>(defaultUserStats)
+  const [newlyUnlocked, setNewlyUnlocked] = useState<Achievement[]>([])
+  const { connected, publicKey } = useWallet()
 
-  const updateStats = (statType: keyof UserStats, value: number) => {
-    setUserStats(prev => {
-      const newStats = { ...prev, [statType]: prev[statType] + value };
-      
-      // Level up logic
-      if (newStats.xp >= newStats.maxXp) {
-        newStats.level += 1;
-        newStats.xp = 0;
-        newStats.maxXp = Math.floor(newStats.maxXp * 1.5);
-      }
-      
-      return newStats;
-    });
-  };
-
-  const showNotification = (achievement: Achievement) => {
-    setNotifications(prev => [...prev, achievement]);
-    setTimeout(() => {
-      setNotifications(prev => prev.filter(a => a.id !== achievement.id));
-    }, 5000);
-  };
-
-  // Check achievements
+  // Load saved data from localStorage
   useEffect(() => {
-    setAchievements(prev => prev.map(achievement => {
-      let progress = achievement.progress;
-      
-      switch (achievement.id) {
-        case 'first-wallet':
-          progress = userStats.walletsConnected;
-          break;
-        case 'whale-trader':
-          progress = userStats.tradesSimulated;
-          break;
-        case 'dao-member':
-          progress = userStats.daoVotes;
-          break;
-        case 'community-builder':
-          progress = userStats.referrals;
-          break;
-        case 'diamond-hands':
-          progress = userStats.daysActive;
-          break;
-        case 'early-adopter':
-          progress = userStats.level > 1 ? 1 : 0;
-          break;
-      }
-      
-      const wasUnlocked = achievement.unlocked;
-      const isUnlocked = progress >= achievement.maxProgress;
-      
-      if (!wasUnlocked && isUnlocked) {
-        showNotification({ ...achievement, unlocked: true });
-        // Award XP for achievement
-        updateStats('xp', Number.parseInt(achievement.reward.split(' ')[0]));
-      }
-      
-      return { ...achievement, progress, unlocked: isUnlocked };
-    }));
-  }, [userStats]);
+    if (typeof window !== 'undefined') {
+      const savedAchievements = localStorage.getItem('boomroach-achievements')
+      const savedStats = localStorage.getItem('boomroach-stats')
 
-  return (
-    <GamificationContext.Provider value={{ userStats, achievements, updateStats, showNotification }}>
-      {children}
-      <AchievementNotifications notifications={notifications} />
-    </GamificationContext.Provider>
-  );
-};
+      if (savedAchievements) {
+        try {
+          setAchievements(JSON.parse(savedAchievements))
+        } catch (e) {
+          console.error('Failed to load achievements:', e)
+        }
+      }
 
-export const useGamification = () => {
-  const context = useContext(GamificationContext);
-  if (!context) {
-    throw new Error('useGamification must be used within GamificationProvider');
+      if (savedStats) {
+        try {
+          setUserStats(JSON.parse(savedStats))
+        } catch (e) {
+          console.error('Failed to load stats:', e)
+        }
+      }
+    }
+  }, [])
+
+  // Save data to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('boomroach-achievements', JSON.stringify(achievements))
+    }
+  }, [achievements])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('boomroach-stats', JSON.stringify(userStats))
+    }
+  }, [userStats])
+
+  // Check for wallet connection achievement
+  useEffect(() => {
+    if (connected && publicKey) {
+      updateStats('walletsConnected', 1)
+      checkAchievement('first-connection', 1)
+    }
+  }, [connected, publicKey])
+
+  const updateStats = (stat: keyof UserStats, value: number) => {
+    setUserStats(prev => ({
+      ...prev,
+      [stat]: stat === 'walletsConnected' || stat === 'daoVotes' || stat === 'totalTrades' || stat === 'referrals' || stat === 'daysActive'
+        ? Math.max(prev[stat], value) // Don't decrease counters
+        : value
+    }))
   }
-  return context;
-};
 
-const AchievementNotifications: React.FC<{ notifications: Achievement[] }> = ({ notifications }) => {
+  const addXP = (amount: number) => {
+    setUserStats(prev => {
+      const newXP = prev.xp + amount
+      const newLevel = Math.floor(newXP / 1000) + 1
+      const nextLevelXp = newLevel * 1000
+
+      return {
+        ...prev,
+        xp: newXP,
+        level: newLevel,
+        nextLevelXp
+      }
+    })
+  }
+
+  const checkLevelUp = (): boolean => {
+    const newLevel = Math.floor(userStats.xp / 1000) + 1
+    if (newLevel > userStats.level) {
+      checkAchievement('level-10', newLevel >= 10 ? 1 : 0)
+      return true
+    }
+    return false
+  }
+
+  const checkAchievement = (achievementId: string, progress: number) => {
+    setAchievements(prev =>
+      prev.map(achievement => {
+        if (achievement.id === achievementId && !achievement.unlocked) {
+          const newProgress = Math.min(progress, achievement.maxProgress)
+          const shouldUnlock = newProgress >= achievement.maxProgress
+
+          if (shouldUnlock) {
+            const updatedAchievement = {
+              ...achievement,
+              progress: newProgress,
+              unlocked: true,
+              unlockedAt: new Date()
+            }
+
+            // Add to newly unlocked for notifications
+            setNewlyUnlocked(prev => [...prev, updatedAchievement])
+
+            // Award XP based on rarity
+            const xpReward = {
+              common: 100,
+              rare: 250,
+              epic: 500,
+              legendary: 1000
+            }[achievement.rarity]
+
+            addXP(xpReward)
+
+            return updatedAchievement
+          } else {
+            return {
+              ...achievement,
+              progress: newProgress
+            }
+          }
+        }
+        return achievement
+      })
+    )
+  }
+
+  const unlockAchievement = (achievementId: string) => {
+    checkAchievement(achievementId, 1)
+  }
+
+  const value = {
+    achievements,
+    userStats,
+    updateStats,
+    unlockAchievement,
+    addXP,
+    checkLevelUp
+  }
+
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <GamificationContext.Provider value={value}>
+      {children}
+      <AchievementNotifications
+        achievements={newlyUnlocked}
+        onDismiss={(id) => setNewlyUnlocked(prev => prev.filter(a => a.id !== id))}
+      />
+    </GamificationContext.Provider>
+  )
+}
+
+// Achievement notification component
+function AchievementNotifications({
+  achievements,
+  onDismiss
+}: {
+  achievements: Achievement[]
+  onDismiss: (id: string) => void
+}) {
+  return (
+    <div className="fixed top-4 right-4 z-50 space-y-4">
       <AnimatePresence>
-        {notifications.map((achievement) => (
+        {achievements.map((achievement) => (
           <motion.div
             key={achievement.id}
             initial={{ opacity: 0, x: 300, scale: 0.8 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 300, scale: 0.8 }}
-            className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 
-                     backdrop-blur-lg rounded-lg p-4 max-w-sm"
+            className="max-w-sm p-4 rounded-lg glassmorphism border border-neon-orange/50 bg-nuclear-gradient/20 shadow-2xl"
+            onClick={() => onDismiss(achievement.id)}
           >
-            <div className="flex items-center space-x-3">
-              <div className="text-amber-400">
-                {achievement.icon}
-              </div>
-              <div>
-                <p className="font-bold text-white">Achievement Unlocked!</p>
-                <p className="text-sm text-amber-200">{achievement.title}</p>
-                <p className="text-xs text-zinc-400">{achievement.reward}</p>
+            <div className="flex items-start space-x-3">
+              <div className="text-2xl">{achievement.icon}</div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-neon-orange">Achievement Unlocked!</h4>
+                <p className="text-sm font-medium">{achievement.title}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {achievement.description}
+                </p>
+                {achievement.reward && (
+                  <div className="mt-2 p-2 rounded bg-background/50 border border-neon-green/30">
+                    <div className="text-xs text-neon-green font-semibold">
+                      🎁 {achievement.reward.description}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
         ))}
       </AnimatePresence>
     </div>
-  );
-};
+  )
+}
 
-export const UserProgressCard: React.FC = React.memo(() => {
-  const { userStats } = useGamification();
-  
-  return (
-    <Card className="bg-gradient-to-br from-zinc-900/50 to-zinc-800/50 border-zinc-700/50 backdrop-blur-sm">
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Trophy className="w-5 h-5 text-amber-400" />
-          <span>Level {userStats.level}</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <div className="flex justify-between text-sm mb-2">
-            <span>XP Progress</span>
-            <span>{userStats.xp}/{userStats.maxXp}</span>
-          </div>
-          <Progress value={(userStats.xp / userStats.maxXp) * 100} className="h-2" />
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div className="text-center">
-            <p className="text-zinc-400">Trades</p>
-            <p className="font-bold text-orange-400">{userStats.tradesSimulated}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-zinc-400">DAO Votes</p>
-            <p className="font-bold text-blue-400">{userStats.daoVotes}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-});
-
-UserProgressCard.displayName = "UserProgressCard";
-
-export const AchievementGrid: React.FC = React.memo(() => {
-  const { achievements } = useGamification();
-  
-  const tierColors = {
-    bronze: 'from-amber-600/20 to-amber-800/20 border-amber-600/30',
-    silver: 'from-slate-400/20 to-slate-600/20 border-slate-400/30',
-    gold: 'from-yellow-400/20 to-yellow-600/20 border-yellow-400/30',
-    diamond: 'from-cyan-400/20 to-blue-600/20 border-cyan-400/30'
-  };
-  
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {achievements.map((achievement) => (
-        <motion.div
-          key={achievement.id}
-          whileHover={{ scale: 1.02 }}
-          className={`p-4 rounded-lg bg-gradient-to-br ${tierColors[achievement.tier]} 
-                     backdrop-blur-sm border ${achievement.unlocked ? 'opacity-100' : 'opacity-60'}`}
-        >
-          <div className="flex items-center space-x-3 mb-3">
-            <div className={`p-2 rounded-full ${achievement.unlocked ? 'bg-white/20' : 'bg-zinc-800/50'}`}>
-              {achievement.icon}
-            </div>
-            <div>
-              <h3 className="font-bold text-white">{achievement.title}</h3>
-              <Badge variant="outline" className="text-xs">
-                {achievement.tier.toUpperCase()}
-              </Badge>
-            </div>
-          </div>
-          
-          <p className="text-sm text-zinc-300 mb-3">{achievement.description}</p>
-          
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs">
-              <span>Progress</span>
-              <span>{achievement.progress}/{achievement.maxProgress}</span>
-            </div>
-            <Progress 
-              value={(achievement.progress / achievement.maxProgress) * 100} 
-              className="h-1"
-            />
-          </div>
-          
-          {achievement.unlocked && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mt-3 text-xs text-amber-400 font-bold"
-            >
-              🎉 Reward: {achievement.reward}
-            </motion.div>
-          )}
-        </motion.div>
-      ))}
-    </div>
-  );
-});
-
-AchievementGrid.displayName = "AchievementGrid";
-
-export const Leaderboard: React.FC = React.memo(() => {
-  const leaderboardData = [
-    { rank: 1, address: "9WzDX...7Kp2", level: 15, xp: 12500, badge: "🏆" },
-    { rank: 2, address: "7KpL2...9Wd8", level: 13, xp: 10200, badge: "🥈" },
-    { rank: 3, address: "5Wd8X...2KpL", level: 12, xp: 9800, badge: "🥉" },
-    { rank: 4, address: "3KpL7...8Wd9", level: 11, xp: 8500, badge: "⭐" },
-    { rank: 5, address: "1Wd9K...7pL3", level: 10, xp: 7200, badge: "⭐" },
-  ];
-  
-  return (
-    <Card className="bg-gradient-to-br from-zinc-900/50 to-zinc-800/50 border-zinc-700/50 backdrop-blur-sm">
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Crown className="w-5 h-5 text-amber-400" />
-          <span>Top Holders Leaderboard</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {leaderboardData.map((user) => (
-            <motion.div
-              key={user.rank}
-              whileHover={{ scale: 1.02 }}
-              className="flex items-center justify-between p-3 rounded-lg bg-zinc-800/30 
-                       border border-zinc-700/30"
-            >
-              <div className="flex items-center space-x-3">
-                <span className="text-2xl">{user.badge}</span>
-                <div>
-                  <p className="font-mono text-sm">{user.address}</p>
-                  <p className="text-xs text-zinc-400">Level {user.level}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-orange-400">{user.xp.toLocaleString()} XP</p>
-                <p className="text-xs text-zinc-400">#{user.rank}</p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-});
-
-Leaderboard.displayName = "Leaderboard";
+export function useGamification() {
+  const context = useContext(GamificationContext)
+  if (!context) {
+    throw new Error('useGamification must be used within a GamificationProvider')
+  }
+  return context
+}

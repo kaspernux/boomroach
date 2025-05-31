@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: boomroach_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: boomroach_dev
+      POSTGRES_USER: boomroach
+      POSTGRES_PASSWORD: boomroach_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - boomroach_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U boomroach -d boomroach_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: boomroach_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - boomroach_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # BoomRoach API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: boomroach_api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://boomroach:boomroach_password@postgres:5432/boomroach_dev?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: development-jwt-secret-change-in-production
+      FRONTEND_URL: http://localhost:3000
+      ENABLE_WEBSOCKET: "true"
+      ENABLE_PRICE_UPDATES: "true"
+      LOG_LEVEL: debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - boomroach_network
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx for reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: boomroach_nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - api
+    networks:
+      - boomroach_network
+    profiles:
+      - nginx
+
+  # Adminer for database management (development only)
+  adminer:
+    image: adminer:latest
+    container_name: boomroach_adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: hydra
+    depends_on:
+      - postgres
+    networks:
+      - boomroach_network
+    profiles:
+      - admin
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  boomroach_network:
+    driver: bridge

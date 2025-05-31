@@ -1,0 +1,442 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String?  @unique
+  username          String   @unique
+  walletAddress     String   @unique
+  publicKey         String?
+  avatar            String?
+  level             Int      @default(1)
+  experience        Int      @default(0)
+  totalTrades       Int      @default(0)
+  totalPnL          Float    @default(0)
+  isVerified        Boolean  @default(false)
+  isAdmin           Boolean  @default(false)
+  isBanned          Boolean  @default(false)
+  lastLoginAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  achievements      UserAchievement[]
+  quests           UserQuest[]
+  trades           Trade[]
+  portfolio        Portfolio?
+  guildMember      GuildMember?
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  sessions         Session[]
+  socialProfile    SocialProfile?
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Achievement {
+  id           String   @id @default(cuid())
+  title        String
+  description  String
+  icon         String
+  type         AchievementType
+  rarity       AchievementRarity
+  requirements Json     // Dynamic requirements
+  rewards      Json     // XP, tokens, badges, etc.
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  userAchievements UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String    @id @default(cuid())
+  userId        String
+  achievementId String
+  progress      Int       @default(0)
+  maxProgress   Int       @default(1)
+  isUnlocked    Boolean   @default(false)
+  unlockedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}
+
+model Quest {
+  id           String     @id @default(cuid())
+  title        String
+  description  String
+  type         QuestType
+  category     QuestCategory
+  difficulty   QuestDifficulty
+  requirements Json       // Dynamic requirements
+  rewards      Json       // XP, tokens, items, etc.
+  maxProgress  Int        @default(1)
+  timeLimit    Int?       // in seconds
+  isActive     Boolean    @default(true)
+  seasonalTheme String?   // halloween, christmas, etc.
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relationships
+  userQuests UserQuest[]
+
+  @@map("quests")
+}
+
+model UserQuest {
+  id          String    @id @default(cuid())
+  userId      String
+  questId     String
+  progress    Int       @default(0)
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quest Quest @relation(fields: [questId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questId])
+  @@map("user_quests")
+}
+
+model Guild {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  description  String
+  logo         String?
+  level        Int      @default(1)
+  experience   Int      @default(0)
+  maxMembers   Int      @default(50)
+  totalPower   Int      @default(0)
+  rank         Int      @default(0)
+  isPublic     Boolean  @default(true)
+  requirements Json     // minLevel, minTradingVolume, etc.
+  perks        Json     // xpBonus, tradingFeeDiscount, etc.
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  members    GuildMember[]
+  wars       GuildWar[]   @relation("AttackerGuild")
+  defending  GuildWar[]   @relation("DefenderGuild")
+  quests     GuildQuest[]
+  channels   GuildChannel[]
+
+  @@map("guilds")
+}
+
+model GuildMember {
+  id           String     @id @default(cuid())
+  userId       String     @unique
+  guildId      String
+  role         GuildRole  @default(MEMBER)
+  contribution Int        @default(0)
+  joinedAt     DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@map("guild_members")
+}
+
+model GuildQuest {
+  id                 String      @id @default(cuid())
+  guildId            String
+  title              String
+  description        String
+  type               GuildQuestType
+  difficulty         QuestDifficulty
+  progress           Int         @default(0)
+  maxProgress        Int
+  participatingMembers Int       @default(0)
+  rewards            Json        // guildXp, memberTokens, etc.
+  requirements       Json        // minMembers, roles, etc.
+  isActive           Boolean     @default(true)
+  expiresAt          DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@map("guild_quests")
+}
+
+model GuildWar {
+  id           String     @id @default(cuid())
+  attackerGuildId String
+  defenderGuildId String
+  objectives   Json       // war objectives and points
+  attackerScore Int       @default(0)
+  defenderScore Int       @default(0)
+  status       WarStatus  @default(UPCOMING)
+  rewards      Json       // winner and participant rewards
+  startTime    DateTime
+  endTime      DateTime
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  attackerGuild Guild @relation("AttackerGuild", fields: [attackerGuildId], references: [id])
+  defenderGuild Guild @relation("DefenderGuild", fields: [defenderGuildId], references: [id])
+
+  @@map("guild_wars")
+}
+
+model GuildChannel {
+  id        String   @id @default(cuid())
+  guildId   String
+  name      String
+  type      ChannelType @default(TEXT)
+  isPrivate Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  guild    Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@map("guild_channels")
+}
+
+model Message {
+  id        String      @id @default(cuid())
+  senderId  String
+  receiverId String?    // for direct messages
+  channelId String?    // for guild channels
+  content   String
+  type      MessageType @default(TEXT)
+  reactions Json?      // emoji reactions
+  editedAt  DateTime?
+  deletedAt DateTime?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  sender   User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User?         @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  channel  GuildChannel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Trade {
+  id            String     @id @default(cuid())
+  userId        String
+  symbol        String     // e.g., "SOL/USDC"
+  type          TradeType
+  side          TradeSide
+  amount        Float
+  price         Float
+  executedPrice Float?
+  status        TradeStatus @default(PENDING)
+  pnl           Float       @default(0)
+  fees          Float       @default(0)
+  signature     String?     // Solana transaction signature
+  source        TradeSource @default(MANUAL)
+  metadata      Json?       // Additional trade data
+  executedAt    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("trades")
+}
+
+model Portfolio {
+  id           String @id @default(cuid())
+  userId       String @unique
+  totalValue   Float  @default(0)
+  totalPnL     Float  @default(0)
+  totalPnLPercent Float @default(0)
+  lastUpdated  DateTime @default(now())
+  positions    Json   // Array of position objects
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("portfolios")
+}
+
+model PriceData {
+  id        String   @id @default(cuid())
+  symbol    String
+  price     Float
+  change24h Float
+  volume24h Float
+  high24h   Float
+  low24h    Float
+  marketCap Float?
+  source    String   // jupiter, raydium, etc.
+  timestamp DateTime @default(now())
+
+  @@unique([symbol, timestamp])
+  @@map("price_data")
+}
+
+model SocialProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  bio           String?
+  socialLinks   Json?    // twitter, discord, etc.
+  achievements  Json?    // displayed achievements
+  stats         Json?    // public stats
+  privacy       Json?    // privacy settings
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("social_profiles")
+}
+
+model AdminLog {
+  id        String     @id @default(cuid())
+  adminId   String
+  action    String
+  target    String?    // user ID, guild ID, etc.
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime   @default(now())
+
+  @@map("admin_logs")
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
+}
+
+// Enums
+enum AchievementType {
+  WALLET
+  TRADING
+  DAO
+  SOCIAL
+  SPECIAL
+  GUILD
+}
+
+enum AchievementRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+enum QuestType {
+  DAILY
+  WEEKLY
+  SEASONAL
+  SPECIAL
+  GUILD
+}
+
+enum QuestCategory {
+  TRADING
+  SOCIAL
+  COMMUNITY
+  ACHIEVEMENT
+  EXPLORATION
+}
+
+enum QuestDifficulty {
+  EASY
+  MEDIUM
+  HARD
+  LEGENDARY
+}
+
+enum GuildRole {
+  LEADER
+  OFFICER
+  MEMBER
+}
+
+enum GuildQuestType {
+  COLLABORATIVE
+  COMPETITIVE
+  RAID
+}
+
+enum WarStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ChannelType {
+  TEXT
+  VOICE
+  ANNOUNCEMENT
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  SYSTEM
+  TRADE_SIGNAL
+}
+
+enum TradeType {
+  MARKET
+  LIMIT
+  STOP_LOSS
+}
+
+enum TradeSide {
+  BUY
+  SELL
+}
+
+enum TradeStatus {
+  PENDING
+  PARTIAL
+  FILLED
+  CANCELLED
+  FAILED
+}
+
+enum TradeSource {
+  MANUAL
+  HYDRA_BOT
+  COPY_TRADE
+}

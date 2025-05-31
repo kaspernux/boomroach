@@ -251,7 +251,7 @@ export function useRealTimeSignals() {
   const [signals, setSignals] = useState<TradingSignal[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchSignals = async () => {
+  const fetchSignals = React.useCallback(async () => {
     try {
       setLoading(true);
       const hydraAPI = HydraAPIService.getInstance();
@@ -262,7 +262,7 @@ export function useRealTimeSignals() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Auto-refresh every 30 seconds
   React.useEffect(() => {
@@ -278,7 +278,7 @@ export function useRealTimeBotPerformance() {
   const [performance, setPerformance] = useState<BotPerformance | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const fetchPerformance = async () => {
+  const fetchPerformance = React.useCallback(async () => {
     try {
       setLoading(true);
       const hydraAPI = HydraAPIService.getInstance();
@@ -289,7 +289,7 @@ export function useRealTimeBotPerformance() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   React.useEffect(() => {
     fetchPerformance();
